@@ -250,7 +250,8 @@ dotnet tool restore
 
 # 1. Base de datos
 dotnet tool run dotnet-ef database update --project src/Fudis.Payments --startup-project src/Fudis.Payments
-#    o el script idempotente:  sqlcmd -S "(localdb)\MSSQLLocalDB" -i database.sql
+#    alternativa si tenés SQL Server Command Line Tools:
+#    sqlcmd -S "(localdb)\MSSQLLocalDB" -i database.sql
 
 # 2. Pruebas (crea y migra su propia base FudisPaymentsTests)
 dotnet test
