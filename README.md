@@ -245,7 +245,12 @@ el servicio del restaurante caído: pago aplicado, notificación encolada, reint
 | EF Core tools | 8.0.11 (tool local del repo: `dotnet tool restore`) |
 
 ```bash
+# received as a git repository
 git clone <repo> && cd fudis-payments
+
+# or received as a compressed archive
+# unzip fudis-payments.zip && cd fudis-payments
+
 dotnet tool restore
 
 # 1. Base de datos
