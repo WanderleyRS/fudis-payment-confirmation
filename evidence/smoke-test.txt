@@ -1,0 +1,24 @@
+Seeded pending order #3
+POST http://localhost:5085/api/payments/confirm-payment
+Canonical payload: stripe|evt_smoke_1793907054649|3|55.00|BRL|2026-11-05T19:30:54.8836300Z|2026-11-05T19:30:54.8846321Z
+HTTP 200: {"status":"processed","orderId":3}
+Second delivery (same event): HTTP 200: {"status":"duplicate","orderId":3}
+Resulting state:
+
+Id Status Earnings EarningAmount Inbox Outbox
+-- ------ -------- ------------- ----- ------
+ 3 Paid          1         21,00     1      1
+
+
+
+
+--- Outbox state: the restaurant service is DOWN (nothing listening on :5080) ---
+The payment stays applied, the notification stays queued and the retry is scheduled.
+
+
+Id OrderId Status     Attempts NextAttemptAt             LastError                                                     
+-- ------- ------     -------- -------------             ---------                                                     
+ 2       3 Pending           1 5/11/2026 19:31:01 +00:00 No se puede establecer una conexión ya que el equipo de des...
+ 1       1 Processing        3 5/11/2026 19:27:11 +00:00 No se puede establecer una conexión ya que el equipo de des...
+
+

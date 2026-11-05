@@ -1,0 +1,66 @@
+﻿Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Correctas Fudis.Payments.Tests.ConcurrencyTests.ConcurrentDeliveries_NeverReturnServerError [2 s]
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+Error Number:2601,State:1,Class:14
+at Fudis.Payments.Tests.FakeNotificationService.NotifyRestaurant(Int32 orderId, CancellationToken cancellationToken) in C:\Users\WanderleyRocha\fudis-payments\tests\Fudis.Payments.Tests\FakeNotificationService.cs:line 36
+at Fudis.Payments.Tests.FakeNotificationService.NotifyRestaurant(Int32 orderId, CancellationToken cancellationToken) in C:\Users\WanderleyRocha\fudis-payments\tests\Fudis.Payments.Tests\FakeNotificationService.cs:line 36
+Correctas Fudis.Payments.Tests.ConcurrencyTests.ConcurrentDeliveriesOfTheSameEvent_CreateExactlyOneDriverEarning [361 ms]
+Correctas Fudis.Payments.Tests.ConcurrencyTests.ConcurrentDeliveriesOfDifferentEventsForTheSameOrder_CreateExactlyOneDriverEarning [143 ms]
+Correctas Fudis.Payments.Tests.ConcurrencyTests.WithoutTheUniqueIndex_TheOriginalSchemaPaysTheDriverTwice [104 ms]
+Correctas Fudis.Payments.Tests.LegacyEndpointTests.LegacyEndpoint_AppliesThePaymentAndCreatesTheEarning [112 ms]
+Correctas Fudis.Payments.Tests.LegacyEndpointTests.LegacyEndpoint_WhenTheRestaurantServiceFails_LosesTheNotification_AndFailsTheRequest [68 ms]
+Correctas Fudis.Payments.Tests.LegacyEndpointTests.NewEndpoint_WhenTheRestaurantServiceFails_KeepsThePaymentAndQueuesTheNotification [53 ms]
+Correctas Fudis.Payments.Tests.OutboxDispatcherTests.NewEndpoint_QueuesTheNotification_InsteadOfCallingTheRestaurantInline [51 ms]
+Correctas Fudis.Payments.Tests.OutboxDispatcherTests.Dispatcher_WhenTheRestaurantServiceFails_KeepsThePaymentApplied_AndSchedulesARetry [316 ms]
+Correctas Fudis.Payments.Tests.OutboxDispatcherTests.Dispatcher_DeliversOnRetry_AfterATransientFailure [168 ms]
+Correctas Fudis.Payments.Tests.OutboxDispatcherTests.Dispatcher_DeliversPendingNotification_AndMarksItDelivered [70 ms]
+Correctas Fudis.Payments.Tests.PaymentConfirmationTests.DriverEarning_IsSeventyPercent_RoundedAwayFromZero [53 ms]
+Correctas Fudis.Payments.Tests.PaymentConfirmationTests.SameGatewayEventDeliveredTwice_DoesNotPayTheDriverTwice [92 ms]
+Correctas Fudis.Payments.Tests.PaymentConfirmationTests.OrderThatIsNotPayable_IsRejected_AndNothingIsApplied [33 ms]
+Correctas Fudis.Payments.Tests.PaymentConfirmationTests.SecondGatewayEventForAnAlreadyPaidOrder_IsRejectedAsDoubleCharge [100 ms]
+Correctas Fudis.Payments.Tests.PaymentConfirmationTests.AmountMismatch_IsRejected_AndNothingIsApplied [45 ms]
+Correctas Fudis.Payments.Tests.PaymentConfirmationTests.ConfirmedPayment_AppliesStatusEarningInboxAndOutbox_Together [51 ms]
+Correctas Fudis.Payments.Tests.PaymentConfirmationTests.OrderWithoutAssignedDriver_IsRejected_AndNoEarningIsCreated [23 ms]
+Correctas Fudis.Payments.Tests.PaymentConfirmationTests.ForgedSignature_IsRejected_AndChangesNothing [29 ms]
+Correctas Fudis.Payments.Tests.PaymentConfirmationTests.StaleTimestamp_IsRejected_AndChangesNothing [26 ms]
+Correctas Fudis.Payments.Tests.PaymentConfirmationTests.SignatureSignedWithAnotherSecret_IsRejected_AndChangesNothing [29 ms]
+Correctas Fudis.Payments.Tests.PaymentConfirmationTests.CurrencyMismatch_IsRejected_AndNothingIsApplied [34 ms]
+Correctas Fudis.Payments.Tests.PaymentConfirmationTests.UnknownOrder_ReturnsNotFound [14 ms]
+Correctas Fudis.Payments.Tests.PaymentConfirmationTests.SameGatewayEventIdForADifferentOrder_IsRejected_AndTheSecondOrderIsNotLeftUnpaid [67 ms]
+---
+dotnet test --logger console;verbosity=normal  =>  24 passed, 0 failed (SQL Server LocalDB)
