@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Fudis.Payments.Contracts;
 using Fudis.Payments.Domain;
 using Fudis.Payments.Infra;
@@ -141,7 +142,7 @@ public class PaymentConfirmationService : IPaymentConfirmationService
         {
             OrderId = order.Id,
             Type = "OrderPaid",
-            Payload = $"{{\"orderId\":{order.Id},\"paidAt\":\"{now:O}\",\"amount\":{earningAmount.ToString(System.Globalization.CultureInfo.InvariantCulture)}}}",
+            Payload = JsonSerializer.Serialize(new OrderPaidNotification(order.Id, earningAmount, order.Currency, now)),
             Status = OutboxStatus.Pending,
             NextAttemptAt = now
         });

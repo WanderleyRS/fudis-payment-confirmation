@@ -3,7 +3,12 @@
 Evaluación técnica: evaluación del endpoint `confirm-payment` y entrega de una versión endurecida del flujo.
 
 **Stack:** C# / .NET 8 · Entity Framework Core 8.0.11 · SQL Server (LocalDB) · xUnit 2.9.2
-**Pruebas:** 24/24 en verde sobre SQL Server real (no mocks de base de datos).
+**Pruebas:** 25/25 en verde sobre SQL Server real (no mocks de base de datos).
+
+> **Alcance de la entrega.** El enunciado no incluía el repositorio de Fudis (solo el fragmento del endpoint), así que
+> esta entrega es una **implementación autocontenida y ejecutable** del flujo, no un diff sobre su código. El
+> fragmento original se conserva como endpoint `legacy` ejecutable para poder comparar. Todo lo que dependía de
+> datos que no nos dieron está declarado como supuesto en §6, con su consecuencia.
 
 ---
 
@@ -182,12 +187,15 @@ o no (409 de negocio, 401).
 | A4 | El servicio de notificaciones del restaurante es idempotente por `orderId`. | Se podrían generar notificaciones duplicadas al restaurante. |
 | A5 | La DB es SQL Server (índices únicos, `rowversion`, `sp_getapplock`). | En otro motor hay que mapear el equivalente (partial unique index, versionado manual). |
 | A6 | El secreto HMAC vive en configuración/secret store, no en el repo. | En `appsettings.json` hay un valor de desarrollo explícito que **debe** reemplazarse en producción. |
+| A7 | **No se nos dio el repositorio de Fudis**: la entrega es una implementación autocontenida del flujo, no un cambio sobre su código. | Si el código real tiene otras reglas (pago parcial permitido, repartidor asignado después, otros estados), hay que revisarlas y ajustar este diseño. El enunciado lo habilita explícitamente ("puedes completar esos elementos y justificar tus decisiones"). |
+| A8 | `Order.DriverId` usa `0` como "sin repartidor asignado" (en vez de `null`). | Es una convención, no una restricción de base: nada impide en la base un `DriverId` inexistente. Si el esquema real tiene una tabla `Drivers`, corresponde agregar la FK. |
+| A9 | El `Status` es un enum almacenado como texto (`Paid`, `PendingPayment`). | Si la base real guarda `'PAID'` / `'PENDING_PAYMENT'`, la migración tiene que mapear esos valores explícitamente. |
 
 ---
 
 ## 7. Pruebas
 
-### 7.1 Ejecutadas — 24/24 en verde (SQL Server real, no mocks)
+### 7.1 Ejecutadas — 25/25 en verde (SQL Server real, no mocks)
 
 Archivo: `tests/Fudis.Payments.Tests/`. Evidencia: `evidence/test-results.txt`.
 
@@ -211,6 +219,7 @@ Archivo: `tests/Fudis.Payments.Tests/`. Evidencia: `evidence/test-results.txt`.
 | Concurrencia | `ConcurrentDeliveries_NeverReturnServerError` | Bajo concurrencia nunca hay 500 |
 | Concurrencia | `WithoutTheUniqueIndex_TheOriginalSchemaPaysTheDriverTwice` | **Reproduce el defecto original**: sin el índice único, 2 ganancias para un pedido |
 | Outbox | `Dispatcher_DeliversPendingNotification_AndMarksItDelivered` | Entrega y marca `Delivered` |
+| Outbox | `TwoDispatchersRunningAtTheSameTime_DeliverTheNotificationOnlyOnce` | Dos instancias del dispatcher concurrentes → el restaurante recibe **una sola** notificación (el claim de la fila es atómico) |
 | Outbox | `Dispatcher_WhenTheRestaurantServiceFails_KeepsThePaymentApplied_AndSchedulesARetry` | Caída del restaurante → pago intacto, fila `Pending`, `Attempts=1`, reintento agendado |
 | Outbox | `Dispatcher_DeliversOnRetry_AfterATransientFailure` | Reintento posterior entrega y marca `Delivered` |
 | Outbox | `NewEndpoint_QueuesTheNotification_InsteadOfCallingTheRestaurantInline` | El request path no toca el servicio del restaurante |
@@ -300,6 +309,13 @@ pwsh -File scripts/smoke-test.ps1 -BaseUrl http://localhost:5085
 8. **Prisma de pagos múltiples** — no soportado (A1).
 9. **Dead-letter queue del outbox** — tras N intentos la fila sigue en reintento infinito. Falta el estado `Failed`
    terminal y una alerta operativa.
+10. **El formato canónico de la firma es una propuesta propia** — con una pasarela real (Stripe, Mercado Pago) hace
+    falta un adaptador que traduzca su esquema de firma al nuestro. Hoy `X-Fudis-Signature` es nuestro contrato.
+11. **`database.sql` es para una base nueva** — contra la base real de Fudis hay que generar la migración sobre el
+    modelo real (agregar `RowVersion`, `TotalAmount`, `Currency` a `Orders` y crear `PaymentInbox` y
+    `RestaurantNotificationOutbox`), no aplicar los `CREATE TABLE` completos.
+12. **Sin FK a una tabla `Drivers`** — el enunciado no la provee, así que la existencia del repartidor no la
+    garantiza la base; la valida la capa de aplicación.
 
 ---
 
@@ -321,7 +337,7 @@ migración, los tests y este README. También se consultó documentación de EF 
 | La excepción transitoria de base (deadlock 1205) no estaba contemplada | Se agregó `IsTransientConflict` → 409 `CONCURRENCY_CONFLICT` (reintentable) en lugar de 500. |
 | Orden de inserts y riesgo de deadlock entre requests concurrentes | Se verificó que EF ordena los inserts de forma determinista y que la colisión de claves se resuelve bloqueando (no en ciclo), por lo que no hay deadlock entre transacciones concurrentes del mismo pedido. |
 | La prueba de humo destapó un agujero de **plata perdida** en mi propia solución | El `providerEventId` ya visto respondía `duplicate` sin importar a qué pedido se refería. Si la pasarela reutilizaba un id de evento, el segundo pedido quedaba `PendingPayment` con la respuesta "todo bien". Corregido: 409 `EVENT_ID_CONFLICT` + test `SameGatewayEventIdForADifferentOrder_IsRejected_...`. |
-| Revisión adversarial automatizada mult lente | Se intentó lanzar sobre el candidato y **quedó no disponible**: el contrato nativo exige un esquema exacto para la selección de archivos untracked que la CLI no expone, y el commit raíz no se puede expresar como diff con base (árbol vacío). **No se afirma ninguna revisión automática aprobada**; la evidencia es la suite de 24 tests + el smoke test + la inspección del esquema por SQL. |
+| Revisión adversarial automatizada mult lente | Se intentó lanzar sobre el candidato y **quedó no disponible**: el contrato nativo exige un esquema exacto para la selección de archivos untracked que la CLI no expone, y el commit raíz no se puede expresar como diff con base (árbol vacío). **No se afirma ninguna revisión automática aprobada**; la evidencia es la suite de 25 tests + el smoke test + la inspección del esquema por SQL. |
 
 **Verificación manual adicional:** los tests corren contra **SQL Server real** (LocalDB), no contra un proveedor en
 memoria, precisamente porque los comportamientos relevantes (índice único, `rowversion`, violación de clave bajo concurrencia)
@@ -344,7 +360,7 @@ fudis-payments/
 │  ├─ Controllers/       PaymentsController (nuevo) + LegacyPaymentsController (original, como referencia)
 │  ├─ Infra/             FudisDbContext (+ factory de design-time)
 │  └─ Migrations/        InitialCreate
-├─ tests/Fudis.Payments.Tests/    24 tests de integración sobre SQL Server
+├─ tests/Fudis.Payments.Tests/    25 tests de integración sobre SQL Server
 ├─ scripts/smoke-test.ps1         demo end-to-end firmado
 ├─ database.sql                   script SQL idempotente
 ├─ evidence/test-results.txt      salida de la corrida de tests

@@ -40,34 +40,36 @@ public class OutboxDispatcher
             .Where(o => o.Status == OutboxStatus.Processing && o.ProcessingStartedAt < now - ClaimTimeout)
             .ExecuteUpdateAsync(s => s.SetProperty(o => o.Status, OutboxStatus.Pending), cancellationToken);
 
-        var candidates = await _db.RestaurantNotificationOutbox
+        var candidateIds = await _db.RestaurantNotificationOutbox
             .Where(o => o.Status == OutboxStatus.Pending && o.NextAttemptAt <= now)
             .OrderBy(o => o.Id)
             .Take(batchSize)
             .Select(o => o.Id)
             .ToListAsync(cancellationToken);
 
-        if (candidates.Count == 0)
-        {
-            return 0;
-        }
-
-        // Atomic claim: only the instance that flips Pending -> Processing delivers the row.
-        await _db.RestaurantNotificationOutbox
-            .Where(o => candidates.Contains(o.Id) && o.Status == OutboxStatus.Pending)
-            .ExecuteUpdateAsync(
-                s => s.SetProperty(o => o.Status, OutboxStatus.Processing)
-                      .SetProperty(o => o.ProcessingStartedAt, now),
-                cancellationToken);
-
-        var rows = await _db.RestaurantNotificationOutbox
-            .Where(o => candidates.Contains(o.Id) && o.Status == OutboxStatus.Processing)
-            .ToListAsync(cancellationToken);
-
         var delivered = 0;
 
-        foreach (var row in rows)
+        foreach (var id in candidateIds)
         {
+            // Atomic claim, one row at a time: only the dispatcher whose UPDATE actually flips the row from
+            // Pending to Processing is allowed to deliver it. A batch claim would let two dispatcher
+            // instances select the same ids and both deliver them.
+            var claimed = await _db.RestaurantNotificationOutbox
+                .Where(o => o.Id == id && o.Status == OutboxStatus.Pending)
+                .ExecuteUpdateAsync(
+                    s => s.SetProperty(o => o.Status, OutboxStatus.Processing)
+                          .SetProperty(o => o.ProcessingStartedAt, now),
+                    cancellationToken);
+
+            if (claimed == 0)
+            {
+                continue; // another dispatcher instance claimed this row first
+            }
+
+            _db.ChangeTracker.Clear();
+
+            var row = await _db.RestaurantNotificationOutbox.FirstAsync(o => o.Id == id, cancellationToken);
+
             try
             {
                 await _notifier.NotifyRestaurant(row.OrderId, cancellationToken);

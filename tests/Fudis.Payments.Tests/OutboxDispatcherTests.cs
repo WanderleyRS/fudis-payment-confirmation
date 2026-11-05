@@ -13,6 +13,30 @@ public class OutboxDispatcherTests : ApiTestBase
     public OutboxDispatcherTests(FudisApiFactory factory) : base(factory) { }
 
     [Fact]
+    public async Task TwoDispatchersRunningAtTheSameTime_DeliverTheNotificationOnlyOnce()
+    {
+        var order = await SeedOrderAsync();
+        await PostPaymentAsync(BuildNotification(order.Id, 55.00m));
+
+        // Two independent dispatcher instances (two scopes) draining the same outbox at the same time.
+        using var scopeA = Factory.Services.CreateScope();
+        using var scopeB = Factory.Services.CreateScope();
+
+        var dispatcherA = scopeA.ServiceProvider.GetRequiredService<OutboxDispatcher>();
+        var dispatcherB = scopeB.ServiceProvider.GetRequiredService<OutboxDispatcher>();
+
+        await Task.WhenAll(dispatcherA.DispatchPendingAsync(), dispatcherB.DispatchPendingAsync());
+
+        // The row is claimed atomically, so the restaurant is notified once, not twice.
+        Assert.Single(Factory.Notifier.Calls);
+
+        await using var db = Factory.CreateDbContext();
+        var row = await db.RestaurantNotificationOutbox.AsNoTracking().FirstAsync();
+
+        Assert.Equal(OutboxStatus.Delivered, row.Status);
+    }
+
+    [Fact]
     public async Task Dispatcher_DeliversPendingNotification_AndMarksItDelivered()
     {
         var order = await SeedOrderAsync();
