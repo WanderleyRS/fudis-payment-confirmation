@@ -1,5 +1,61 @@
 # Fudis — Confirmación de pagos
 
+## Executive summary (English)
+
+*The detailed report below is in Spanish. This section is the one-page summary.*
+
+**What the brief asked.** Evaluate the existing `confirm-payment` endpoint and deliver a version that can be
+explained and defended, including the persistence changes and the tests.
+
+**Two critical findings in the original code.** Both are reproduced as executable tests, not just described:
+
+1. **Idempotency does not survive concurrency.** `if (order.Status == "PAID") return Ok();` is a check-then-act:
+   two concurrent notifications both read `PENDING` before either writes, both pass the guard, and both insert a
+   `DriverEarning` row — **the driver is paid twice**.
+2. **The restaurant notification is lost.** It is invoked after `SaveChangesAsync()` and outside any transaction.
+   If it fails, the payment is already committed, the notification is gone, the endpoint returns 500, the gateway
+   retries, the order is already `PAID`, and the early return answers `Ok()` — so the restaurant is never told.
+
+**What this delivery does.**
+
+- **Idempotency per gateway event**: `PaymentInbox` with a unique index on `(Provider, ProviderEventId)`.
+- **One driver earning per order, enforced by the database**: unique index on `DriverEarnings(OrderId)`.
+- **One transaction** writes order status + driver earning + event record + restaurant notification together.
+- **Transactional outbox**: the notification is persisted with the payment and delivered afterwards by a dispatcher
+  with exponential backoff, so a restaurant outage never loses it.
+- **Authenticated webhook**: HMAC-SHA256 signature over a canonical payload, timestamp window, constant-time
+  comparison. The same event id pointing at a different order is rejected, not silently ignored.
+- **Business rules before money moves**: payable state only, amount and currency must match the order, a driver must
+  be assigned, explicit `decimal` rounding policy, `rowversion` optimistic concurrency.
+
+**Guarantees.** Exactly-once application of a gateway event and at most one driver earning per order; atomicity of
+the four writes; the payment never depends on the restaurant service. **Not** guaranteed: exactly-once delivery of
+the notification (it is at-least-once, so the consumer must be idempotent by order id), nor the reversal of a double
+charge that already happened at the gateway — that needs a refund flow, out of scope here.
+
+**Tests.** 25 integration tests against **real SQL Server** (LocalDB), not an in-memory provider, because the
+unique index and `rowversion` conflicts do not reproduce elsewhere. They cover concurrency, duplicate delivery,
+forged signature, stale timestamp, amount and currency mismatch, cancelled orders, unassigned driver, double
+charge, notification outage with retry, and two concurrent dispatchers. The original endpoint is kept as an
+executable legacy route so the differences are demonstrable.
+
+**Run it** (needs the .NET 8 SDK and SQL Server; LocalDB is enough):
+
+```bash
+dotnet tool restore
+dotnet tool run dotnet-ef database update --project src/Fudis.Payments --startup-project src/Fudis.Payments
+dotnet test
+dotnet run --project src/Fudis.Payments --urls http://localhost:5085
+```
+
+Versions: .NET 8.0.425 · EF Core 8.0.11 · xUnit 2.9.2 · SQL Server LocalDB · `dotnet-ef` 8.0.11 (local tool).
+
+> **Scope note.** The brief did not include the Fudis repository, only the endpoint fragment, so this delivery is a
+> self-contained, runnable implementation of the flow rather than a diff over the existing code. Everything that
+> depended on missing data is declared as an assumption in §6, with its consequence.
+
+---
+
 Evaluación técnica: evaluación del endpoint `confirm-payment` y entrega de una versión endurecida del flujo.
 
 **Stack:** C# / .NET 8 · Entity Framework Core 8.0.11 · SQL Server (LocalDB) · xUnit 2.9.2
