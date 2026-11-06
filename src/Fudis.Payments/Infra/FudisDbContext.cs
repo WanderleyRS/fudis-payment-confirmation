@@ -13,6 +13,8 @@ public class FudisDbContext : DbContext
 
     public DbSet<PaymentInbox> PaymentInbox => Set<PaymentInbox>();
 
+    public DbSet<PaymentEventLog> PaymentEventLog => Set<PaymentEventLog>();
+
     public DbSet<RestaurantNotificationOutbox> RestaurantNotificationOutbox => Set<RestaurantNotificationOutbox>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -50,6 +52,19 @@ public class FudisDbContext : DbContext
             entity.Property(i => i.Currency).HasMaxLength(3).IsRequired();
             // Idempotency guarantee: one gateway event is applied at most once.
             entity.HasIndex(i => new { i.Provider, i.ProviderEventId }).IsUnique();
+        });
+
+        modelBuilder.Entity<PaymentEventLog>(entity =>
+        {
+            entity.HasKey(l => l.Id);
+            entity.Property(l => l.Provider).HasMaxLength(32).IsRequired();
+            entity.Property(l => l.ProviderEventId).HasMaxLength(128).IsRequired();
+            entity.Property(l => l.Amount).HasColumnType("decimal(18,2)");
+            entity.Property(l => l.Currency).HasMaxLength(3).IsRequired();
+            entity.Property(l => l.Outcome).HasMaxLength(32).IsRequired();
+            entity.Property(l => l.Detail).HasMaxLength(64);
+            entity.HasIndex(l => new { l.Provider, l.ProviderEventId });
+            entity.HasIndex(l => l.OrderId);
         });
 
         modelBuilder.Entity<RestaurantNotificationOutbox>(entity =>

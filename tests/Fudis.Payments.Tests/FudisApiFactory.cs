@@ -19,8 +19,13 @@ public class FudisApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     public const string SharedSecret = "integration-test-secret";
 
+    /// <summary>
+    /// Defaults to SQL Server LocalDB (Windows). Set FUDIS_TEST_CONNECTION to run the same suite against any
+    /// SQL Server, which is what the CI workflow does on ubuntu-latest.
+    /// </summary>
     public string ConnectionString { get; } =
-        "Server=(localdb)\\MSSQLLocalDB;Database=FudisPaymentsTests;Trusted_Connection=True;MultipleActiveResultSets=True";
+        Environment.GetEnvironmentVariable("FUDIS_TEST_CONNECTION")
+        ?? "Server=(localdb)\\MSSQLLocalDB;Database=FudisPaymentsTests;Trusted_Connection=True;MultipleActiveResultSets=True";
 
     public FakeNotificationService Notifier { get; } = new();
 
@@ -35,6 +40,7 @@ public class FudisApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
                 ["Gateway:SharedSecret"] = SharedSecret,
                 ["Gateway:TimestampToleranceMinutes"] = "15",
                 ["Earnings:DriverShareRate"] = "0.70",
+                ["Outbox:MaxAttempts"] = "3",
                 ["Restaurant:BaseUrl"] = "http://localhost:5080/"
             }));
 
@@ -87,7 +93,7 @@ public class FudisApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     {
         await using var db = CreateDbContext();
         await db.Database.ExecuteSqlRawAsync(
-            "DELETE FROM PaymentInbox; DELETE FROM RestaurantNotificationOutbox; DELETE FROM DriverEarnings; DELETE FROM Orders;");
+            "DELETE FROM PaymentEventLog; DELETE FROM PaymentInbox; DELETE FROM RestaurantNotificationOutbox; DELETE FROM DriverEarnings; DELETE FROM Orders;");
 
         Notifier.Reset();
     }

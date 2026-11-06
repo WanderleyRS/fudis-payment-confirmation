@@ -19,6 +19,7 @@ public class GatewaySignatureValidator : IGatewaySignatureValidator
 {
     public const string SignatureHeader = "X-Fudis-Signature";
     public const string TimestampHeader = "X-Fudis-Timestamp";
+    public const string StaleTimestampError = "STALE_TIMESTAMP";
 
     private readonly GatewayOptions _options;
     private readonly TimeProvider _clock;
@@ -76,7 +77,7 @@ public class GatewaySignatureValidator : IGatewaySignatureValidator
         var tolerance = TimeSpan.FromMinutes(Math.Max(1, _options.TimestampToleranceMinutes));
         if (signedAt < _clock.GetUtcNow() - tolerance || signedAt > _clock.GetUtcNow() + tolerance)
         {
-            error = "STALE_TIMESTAMP";
+            error = StaleTimestampError;
             return false;
         }
 

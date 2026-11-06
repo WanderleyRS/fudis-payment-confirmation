@@ -2,6 +2,7 @@ using System.Text.Json;
 using Fudis.Payments.Domain;
 using Fudis.Payments.Infra;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace Fudis.Payments.Services;
 
@@ -17,19 +18,24 @@ public class OutboxDispatcher
     private readonly FudisDbContext _db;
     private readonly INotificationService _notifier;
     private readonly TimeProvider _clock;
+    private readonly OutboxOptions _options;
     private readonly ILogger<OutboxDispatcher> _logger;
 
     public OutboxDispatcher(
         FudisDbContext db,
         INotificationService notifier,
         TimeProvider clock,
+        IOptions<OutboxOptions> options,
         ILogger<OutboxDispatcher> logger)
     {
         _db = db;
         _notifier = notifier;
         _clock = clock;
+        _options = options.Value;
         _logger = logger;
     }
+
+    private int _maxAttempts => Math.Max(1, _options.MaxAttempts);
 
     public async Task<int> DispatchPendingAsync(int batchSize = 50, CancellationToken cancellationToken = default)
     {
@@ -80,11 +86,25 @@ public class OutboxDispatcher
             }
             catch (Exception ex)
             {
-                row.Status = OutboxStatus.Pending;
                 row.Attempts += 1;
-                row.NextAttemptAt = now + Backoff(row.Attempts);
-                row.LastError = ex.Message;
-                _logger.LogWarning(ex, "Restaurant notification failed for order {OrderId}, attempt {Attempt}", row.OrderId, row.Attempts);
+
+                if (row.Attempts >= _maxAttempts)
+                {
+                    // The retry budget is exhausted. Stop retrying and ask for a human: the notification is
+                    // lost to the restaurant, but it stays visible instead of looping forever.
+                    row.Status = OutboxStatus.Failed;
+                    row.LastError = ex.Message;
+                    _logger.LogError(ex,
+                        "Restaurant notification for order {OrderId} failed after {Attempts} attempts and was moved to the dead letter state",
+                        row.OrderId, row.Attempts);
+                }
+                else
+                {
+                    row.Status = OutboxStatus.Pending;
+                    row.NextAttemptAt = now + Backoff(row.Attempts);
+                    row.LastError = ex.Message;
+                    _logger.LogWarning(ex, "Restaurant notification failed for order {OrderId}, attempt {Attempt}", row.OrderId, row.Attempts);
+                }
             }
 
             await _db.SaveChangesAsync(cancellationToken);

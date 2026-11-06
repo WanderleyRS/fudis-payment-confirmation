@@ -59,7 +59,7 @@ Versions: .NET 8.0.425 · EF Core 8.0.11 · xUnit 2.9.2 · SQL Server LocalDB ·
 Evaluación técnica: evaluación del endpoint `confirm-payment` y entrega de una versión endurecida del flujo.
 
 **Stack:** C# / .NET 8 · Entity Framework Core 8.0.11 · SQL Server (LocalDB) · xUnit 2.9.2
-**Pruebas:** 25/25 en verde sobre SQL Server real (no mocks de base de datos).
+**Pruebas:** 35/35 en verde sobre SQL Server real (no mocks de base de datos). CI en GitHub Actions con SQL Server en Linux: [badge](https://github.com/WanderleyRS/fudis-payment-confirmation/actions/workflows/ci.yml/badge.svg)
 
 > **Alcance de la entrega.** El enunciado no incluía el repositorio de Fudis (solo el fragmento del endpoint), así que
 > esta entrega es una **implementación autocontenida y ejecutable** del flujo, no un diff sobre su código. El
@@ -140,6 +140,7 @@ Background: OutboxDispatcher (cada 5s) → entrega la notificación al restauran
 |-------|--------|---------|
 | `DriverEarnings` | **UNIQUE INDEX (OrderId)** | Garantía de una sola ganancia por pedido. Resuelta por el motor, no por código de aplicación. |
 | `PaymentInbox` (nueva) | **UNIQUE INDEX (Provider, ProviderEventId)** | Idempotencia a nivel de evento de la pasarela. |
+| `PaymentEventLog` (nueva) | índices por `(Provider, ProviderEventId)` y `OrderId` | **Auditoría de todo evento recibido**, incluso los rechazados. Es lo que permite responder "¿cuántos eventos llegaron para este pedido?" y reconciliar un pago cobrado pero no aplicado. |
 | `RestaurantNotificationOutbox` (nueva) | **UNIQUE INDEX (OrderId, Type)**, índice por `(Status, NextAttemptAt)` | Una notificación por pedido; el dispatcher encuentra rápido lo pendiente. |
 | `Orders` | columna `RowVersion` (`rowversion`) | Concurrencia optimista: segunda barrera frente al índice único. |
 | `Orders` | `Status` como enum almacenado como texto; `DeliveryFee`/`TotalAmount` como `decimal(18,2)`; `Currency` | Estados legibles, monto exacto, moneda explícita. |
@@ -188,11 +189,23 @@ Migración: `src/Fudis.Payments/Migrations/` · Script SQL idempotente: `databas
 | 400 | Payload inválido | ProblemDetails de ASP.NET |
 | 401 | Firma inválida o timestamp vencido | `{ "code": "INVALID_SIGNATURE" \| "STALE_TIMESTAMP" \| ... }` |
 | 404 | Pedido inexistente | `{ "code": "ORDER_NOT_FOUND" }` |
-| 409 | Regla de negocio violada | `{ "code": "ORDER_ALREADY_PAID" \| "ORDER_NOT_PAYABLE" \| "AMOUNT_MISMATCH" \| "CURRENCY_MISMATCH" \| "DRIVER_NOT_ASSIGNED" \| "EVENT_ID_CONFLICT" }` |
+| 409 | Regla de negocio violada | `{ "code": "ORDER_ALREADY_PAID" \| "ORDER_NOT_PAYABLE" \| "AMOUNT_MISMATCH" \| "CURRENCY_MISMATCH" \| "DRIVER_NOT_ASSIGNED" \| "EVENT_ID_CONFLICT" \| "EVENT_PAYLOAD_MISMATCH" }` |
 | 409 | Conflicto transitorio, reintentable | `{ "code": "CONCURRENCY_CONFLICT" }` |
 
-El código de error es estable y legible por máquina: la pasarela puede decidir reintentar (409 `CONCURRENCY_CONFLICT`)
-o no (409 de negocio, 401).
+El código de error es estable y legible por máquina: la pasarela puede decidir reintentar o no (409 `CONCURRENCY_CONFLICT`)
+o no.
+
+**Contrato de reintentos (supuesto A10).** Hay que acordarlo con la pasarela, porque cambia qué código HTTP conviene:
+
+| Código | Naturaleza | ¿Reintentar? |
+|--------|-----------|---------------|
+| 200 `processed` / `duplicate` | Resuelto | No |
+| 401 | Firma inválida o timestamp vencido sin evento previo | No (es un evento nuevo y vencido: hay que investigarlo) |
+| 409 `CONCURRENCY_CONFLICT` | Transitorio (otro request ganó la carrera, deadlock) | **Sí** |
+| 409 `ORDER_ALREADY_PAID`, `ORDER_NOT_PAYABLE`, `AMOUNT_MISMATCH`, `CURRENCY_MISMATCH`, `DRIVER_NOT_ASSIGNED`, `EVENT_ID_CONFLICT`, `EVENT_PAYLOAD_MISMATCH` | Permanente: requiere humano, no un reintento | No — y el evento queda registrado en `PaymentEventLog` para reconciliación |
+
+Deliberadamente **no** se devuelve 200 para los conflictos permanentes: un doble cobro tiene que quedar visible, no
+"resuelto". Lo que evita la tormenta de reintentos es el log de eventos y el acuerdo explícito de la pasarela.
 
 ---
 
@@ -206,7 +219,10 @@ o no (409 de negocio, 401).
   transacción**. O se aplica todo, o no se aplica nada.
 - **El pago nunca depende del servicio del restaurante** — la notificación se escribe en la misma transacción y se
   entrega después, con reintentos. Un restaurante caído no revierte ni bloquea un pago.
-- **Nada se autentica sin firma válida** — HMAC-SHA256 con comparación en tiempo constante y ventana de timestamp.
+- **Nada se autentica sin firma válida** - HMAC-SHA256 con comparación en tiempo constante y ventana de timestamp.
+  La única excepción es un reintento tardío de un evento **ya aplicado** con firma **válida**: se responde 200
+  `duplicate` para que la pasarela deje de reintentar un pago ya liquidado. Una firma forjada o ausente nunca
+  recibe un 200, y queda registrada en `PaymentEventLog` como `RejectedAuth`.
 - **El redondeo del dinero es determinista** — `decimal`, 2 decimales, `MidpointRounding.AwayFromZero`.
 - **No se pierde dinero por un repartidor sin asignar** — se rechaza antes de mover plata (`DRIVER_NOT_ASSIGNED`).
 - **No se pierde un pago por un id de evento reutilizado** — si el mismo `providerEventId` llega apuntando a otro
@@ -270,6 +286,16 @@ Archivo: `tests/Fudis.Payments.Tests/`. Evidencia: `evidence/test-results.txt`.
 | Confirmación | `SecondGatewayEventForAnAlreadyPaidOrder_IsRejectedAsDoubleCharge` | Otro evento sobre pedido pagado → 409 `ORDER_ALREADY_PAID` |
 | Confirmación | `UnknownOrder_ReturnsNotFound` | Pedido inexistente → 404 |
 | Confirmación | `SameGatewayEventIdForADifferentOrder_IsRejected_AndTheSecondOrderIsNotLeftUnpaid` | Evento reutilizado sobre otro pedido → 409 `EVENT_ID_CONFLICT`, el segundo pedido **no** queda impagado en silencio |
+| Auditoría | `ForgedSignature_OnAnAlreadyAppliedEvent_StillReturnsUnauthorized` | Firma forzada sobre un evento ya aplicado → **401**, no filtra el `duplicate` |
+| Auditoría | `StaleTimestamp_OnAnAlreadyAppliedEvent_ReturnsDuplicate` | Reintento tardío con firma válida → 200 `duplicate` (el caso laxo, único y justificado) |
+| Auditoría | `SameEventIdWithADifferentAmount_IsRejectedAsPayloadMismatch` | Mismo evento con otro monto → 409 `EVENT_PAYLOAD_MISMATCH`, no un `duplicate` silencioso |
+| Auditoría | `RejectedEvent_LeavesADurableTraceForReconciliation` | Evento rechazado queda en `PaymentEventLog` con `Outcome=Rejected` y el código |
+| Auditoría | `ForgedSignature_IsLoggedAsUnauthenticated` | Firma forzada → `PaymentEventLog` con `Outcome=RejectedAuth` |
+| Auditoría | `AppliedEvent_IsLoggedInTheSameTransactionAsThePayment` | El log del evento aplicado se commitea con el pago, no aparte |
+| Exposición | `LegacyEndpoint_IsNotAvailableOutsideDevelopmentAndTesting` | En entorno Production el endpoint legacy responde **404** |
+| Exposición | `NewEndpoint_IsAvailableInEveryEnvironment` | El endpoint nuevo funciona igual en Production |
+| Outbox | `Notification_MovesToTheDeadLetterState_WhenTheRetryBudgetIsExhausted` | Agotado el presupuesto de reintentos → estado terminal `Failed`, y el dispatcher no lo vuelve a tomar |
+| Outbox | `DeadLetteredNotification_DoesNotAffectThePayment` | La notificación en dead letter no toca el pago ni la ganancia |
 | Concurrencia | `ConcurrentDeliveriesOfTheSameEvent_CreateExactlyOneDriverEarning` | 8 entregas concurrentes del mismo evento → 1 ganancia, 1 inbox, 1 outbox, todas 200 |
 | Concurrencia | `ConcurrentDeliveriesOfDifferentEventsForTheSameOrder_CreateExactlyOneDriverEarning` | 6 eventos distintos sobre el mismo pedido → 1 ganancia, 1 respuesta 200 y el resto 409 |
 | Concurrencia | `ConcurrentDeliveries_NeverReturnServerError` | Bajo concurrencia nunca hay 500 |
@@ -326,6 +352,10 @@ dotnet tool run dotnet-ef database update --project src/Fudis.Payments --startup
 # 2. Pruebas (crea y migra su propia base FudisPaymentsTests)
 dotnet test
 
+#    Para correr contra cualquier SQL Server (CI, Linux, contenedor):
+#    $env:FUDIS_TEST_CONNECTION = "Server=...;Database=FudisPaymentsTests;User Id=sa;Password=...;TrustServerCertificate=True"
+#    dotnet test
+
 # 3. Levantar la API
 dotnet run --project src/Fudis.Payments --urls http://localhost:5085
 
@@ -363,15 +393,20 @@ pwsh -File scripts/smoke-test.ps1 -BaseUrl http://localhost:5085
 7. **Notificación fuera de banda** — el dispatcher corre dentro de la API. Con volumen alto conviene un worker
    dedicado (mismo código, otro host).
 8. **Prisma de pagos múltiples** — no soportado (A1).
-9. **Dead-letter queue del outbox** — tras N intentos la fila sigue en reintento infinito. Falta el estado `Failed`
-   terminal y una alerta operativa.
+9. **Dead-letter queue del outbox** — implementado: tras `Outbox:MaxAttempts` (10 por defecto) la notificación pasa
+   al estado terminal `Failed` y se loguea como error para que un humano la tome. Falta la herramienta operativa
+   para listar y reprocesar esas filas.
 10. **El formato canónico de la firma es una propuesta propia** — con una pasarela real (Stripe, Mercado Pago) hace
     falta un adaptador que traduzca su esquema de firma al nuestro. Hoy `X-Fudis-Signature` es nuestro contrato.
 11. **`database.sql` es para una base nueva** — contra la base real de Fudis hay que generar la migración sobre el
-    modelo real (agregar `RowVersion`, `TotalAmount`, `Currency` a `Orders` y crear `PaymentInbox` y
-    `RestaurantNotificationOutbox`), no aplicar los `CREATE TABLE` completos.
+    modelo real (agregar `RowVersion`, `TotalAmount`, `Currency` a `Orders` y crear `PaymentInbox`,
+    `PaymentEventLog` y `RestaurantNotificationOutbox`), no aplicar los `CREATE TABLE` completos.
 12. **Sin FK a una tabla `Drivers`** — el enunciado no la provee, así que la existencia del repartidor no la
     garantiza la base; la valida la capa de aplicación.
+13. **Reconciliación y reembolsos** — el log de eventos permite detectar el caso "cobrado pero rechazado", pero el
+    flujo de refund sigue sin implementarse.
+14. **Endpoint legacy** — desactivado fuera de Development/Testing (responde 404), pero el código sigue en el repo
+    como referencia. En un repo de producción lo borraría del build.
 
 ---
 
@@ -393,7 +428,8 @@ migración, los tests y este README. También se consultó documentación de EF 
 | La excepción transitoria de base (deadlock 1205) no estaba contemplada | Se agregó `IsTransientConflict` → 409 `CONCURRENCY_CONFLICT` (reintentable) en lugar de 500. |
 | Orden de inserts y riesgo de deadlock entre requests concurrentes | Se verificó que EF ordena los inserts de forma determinista y que la colisión de claves se resuelve bloqueando (no en ciclo), por lo que no hay deadlock entre transacciones concurrentes del mismo pedido. |
 | La prueba de humo destapó un agujero de **plata perdida** en mi propia solución | El `providerEventId` ya visto respondía `duplicate` sin importar a qué pedido se refería. Si la pasarela reutilizaba un id de evento, el segundo pedido quedaba `PendingPayment` con la respuesta "todo bien". Corregido: 409 `EVENT_ID_CONFLICT` + test `SameGatewayEventIdForADifferentOrder_IsRejected_...`. |
-| Revisión adversarial automatizada mult lente | Se intentó lanzar sobre el candidato y **quedó no disponible**: el contrato nativo exige un esquema exacto para la selección de archivos untracked que la CLI no expone, y el commit raíz no se puede expresar como diff con base (árbol vacío). **No se afirma ninguna revisión automática aprobada**; la evidencia es la suite de 25 tests + el smoke test + la inspección del esquema por SQL. |
+| Revisión adversarial automatizada mult lente | Se intentó lanzar sobre el candidato y **quedó no disponible**: el contrato nativo exige un esquema exacto para la selección de archivos untracked que la CLI no expone, y el commit raíz no se puede expresar como diff con base (árbol vacío). **No se afirma ninguna revisión automática aprobada**; la evidencia es la suite de 35 tests + el smoke test + la inspección del esquema por SQL. |
+| **Revisión externa de código** ( otro agente, sobre el repo publicado) | Detectó 7 huecos reales que esta entrega no tenía: el endpoint legacy ruteado en producción, la rama "duplicate" sin firma válida, el mismo event id con payload distinto tratado como duplicate, los eventos rechazados sin registrar, la ausencia de estado terminal en el outbox, la suite atada a LocalDB sin CI, y la falta de dead letter. **Los 6 primeros se implementaron** (35 tests, antes 25); el séptimo (cambiar 409 por 200 en conflictos permanentes) se decidió **no** hacerlo: sin conocer el contrato de la pasarela, un doble cobro debe seguir siendo visible. Todo quedó documentado en §4, §5 y §9. |
 
 **Verificación manual adicional:** los tests corren contra **SQL Server real** (LocalDB), no contra un proveedor en
 memoria, precisamente porque los comportamientos relevantes (índice único, `rowversion`, violación de clave bajo concurrencia)
@@ -416,7 +452,7 @@ fudis-payments/
 │  ├─ Controllers/       PaymentsController (nuevo) + LegacyPaymentsController (original, como referencia)
 │  ├─ Infra/             FudisDbContext (+ factory de design-time)
 │  └─ Migrations/        InitialCreate
-├─ tests/Fudis.Payments.Tests/    25 tests de integración sobre SQL Server
+├─ tests/Fudis.Payments.Tests/    35 tests de integración sobre SQL Server
 ├─ scripts/smoke-test.ps1         demo end-to-end firmado
 ├─ database.sql                   script SQL idempotente
 ├─ evidence/test-results.txt      salida de la corrida de tests

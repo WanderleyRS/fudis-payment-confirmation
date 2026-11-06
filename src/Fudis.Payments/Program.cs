@@ -12,10 +12,12 @@ builder.Services.AddDbContext<FudisDbContext>(options =>
 builder.Services.Configure<GatewayOptions>(builder.Configuration.GetSection("Gateway"));
 builder.Services.Configure<EarningsOptions>(builder.Configuration.GetSection("Earnings"));
 builder.Services.Configure<RestaurantOptions>(builder.Configuration.GetSection("Restaurant"));
+builder.Services.Configure<OutboxOptions>(builder.Configuration.GetSection("Outbox"));
 
 builder.Services.AddSingleton(TimeProvider.System);
 
 builder.Services.AddScoped<IGatewaySignatureValidator, GatewaySignatureValidator>();
+builder.Services.AddScoped<IPaymentEventLogWriter, PaymentEventLogWriter>();
 builder.Services.AddScoped<IPaymentConfirmationService, PaymentConfirmationService>();
 builder.Services.AddScoped<OutboxDispatcher>();
 

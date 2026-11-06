@@ -10,13 +10,16 @@ public class PaymentsController : ControllerBase
 {
     private readonly IPaymentConfirmationService _paymentService;
     private readonly IGatewaySignatureValidator _signatureValidator;
+    private readonly IPaymentEventLogWriter _eventLog;
 
     public PaymentsController(
         IPaymentConfirmationService paymentService,
-        IGatewaySignatureValidator signatureValidator)
+        IGatewaySignatureValidator signatureValidator,
+        IPaymentEventLogWriter eventLog)
     {
         _paymentService = paymentService;
         _signatureValidator = signatureValidator;
+        _eventLog = eventLog;
     }
 
     /// <summary>
@@ -33,13 +36,21 @@ public class PaymentsController : ControllerBase
 
         if (!_signatureValidator.TryValidate(request, signature, timestamp, out var error))
         {
-            // A legitimate gateway retry can arrive after the timestamp window. If the event was already
-            // applied to this same order we answer idempotently instead of 401, so the gateway stops
-            // retrying a settled payment.
-            var processedOrderId = await _paymentService.GetProcessedOrderIdAsync(request.Provider, request.ProviderEventId, cancellationToken);
-            if (processedOrderId == request.OrderId)
+            // The signature is always required. The only lenient case is a valid signature whose timestamp is
+            // outside the window for an event that was ALREADY applied: that is a late legitimate retry of a
+            // settled payment, and answering 200 stops the gateway from retrying forever. A forged or missing
+            // signature is never answered with 200, it is 401 and it is logged.
+            if (error == GatewaySignatureValidator.StaleTimestampError)
             {
-                return Ok(new { status = "duplicate", orderId = request.OrderId });
+                var processedOrderId = await _paymentService.GetProcessedOrderIdAsync(request.Provider, request.ProviderEventId, cancellationToken);
+                if (processedOrderId == request.OrderId)
+                {
+                    return Ok(new { status = "duplicate", orderId = request.OrderId });
+                }
+            }
+            else
+            {
+                await _eventLog.RecordAsync(request, "RejectedAuth", error, authenticated: false, cancellationToken);
             }
 
             return Unauthorized(new { code = error, message = "Invalid gateway signature." });
@@ -58,6 +69,7 @@ public class PaymentsController : ControllerBase
             PaymentOutcome.CurrencyMismatch => Conflict(new { code = result.Code, message = "Currency does not match the order currency." }),
             PaymentOutcome.InvalidAmount => BadRequest(new { code = result.Code, message = "Paid amount must be greater than zero." }),
             PaymentOutcome.EventIdConflict => Conflict(new { code = result.Code, message = "Gateway event id was already used for a different order." }),
+            PaymentOutcome.EventPayloadMismatch => Conflict(new { code = result.Code, message = "Same gateway event id with a different amount or currency." }),
             PaymentOutcome.DriverNotAssigned => Conflict(new { code = result.Code, message = "Order has no assigned driver." }),
             _ => StatusCode(StatusCodes.Status500InternalServerError, new { code = result.Code })
         };

@@ -4,7 +4,10 @@ public enum OutboxStatus
 {
     Pending = 0,
     Processing = 1,
-    Delivered = 2
+    Delivered = 2,
+
+    /// <summary>Terminal state: the retry budget was exhausted and the notification needs a human.</summary>
+    Failed = 3
 }
 
 /// <summary>

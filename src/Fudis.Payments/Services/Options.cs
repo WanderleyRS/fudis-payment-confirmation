@@ -20,3 +20,9 @@ public class RestaurantOptions
     /// <summary>Base address of the restaurant notification service.</summary>
     public string BaseUrl { get; set; } = "http://localhost:5080/";
 }
+
+public class OutboxOptions
+{
+    /// <summary>Retry budget. After this many failed attempts the notification is moved to the dead letter state.</summary>
+    public int MaxAttempts { get; set; } = 10;
+}
