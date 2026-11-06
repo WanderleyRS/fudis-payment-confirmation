@@ -23,9 +23,11 @@ public class FudisApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
     /// Defaults to SQL Server LocalDB (Windows). Set FUDIS_TEST_CONNECTION to run the same suite against any
     /// SQL Server, which is what the CI workflow does on ubuntu-latest.
     /// </summary>
-    public string ConnectionString { get; } =
+    public static string ResolveConnectionString() =>
         Environment.GetEnvironmentVariable("FUDIS_TEST_CONNECTION")
         ?? "Server=(localdb)\\MSSQLLocalDB;Database=FudisPaymentsTests;Trusted_Connection=True;MultipleActiveResultSets=True";
+
+    public string ConnectionString { get; } = ResolveConnectionString();
 
     public FakeNotificationService Notifier { get; } = new();
 

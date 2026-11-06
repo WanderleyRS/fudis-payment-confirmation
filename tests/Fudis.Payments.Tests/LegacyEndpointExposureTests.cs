@@ -65,10 +65,14 @@ public class ProductionApiFactory : WebApplicationFactory<Program>
     {
         builder.UseEnvironment("Production");
 
+        // Same server as the rest of the suite: LocalDB by default, whatever FUDIS_TEST_CONNECTION points to
+        // in CI or on Linux.
+        var connectionString = FudisApiFactory.ResolveConnectionString();
+
         builder.ConfigureAppConfiguration((_, configuration) =>
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:Fudis"] = "Server=(localdb)\\MSSQLLocalDB;Database=FudisPaymentsTests;Trusted_Connection=True;MultipleActiveResultSets=True",
+                ["ConnectionStrings:Fudis"] = connectionString,
                 ["Gateway:SharedSecret"] = FudisApiFactory.SharedSecret,
                 ["Gateway:TimestampToleranceMinutes"] = "15",
                 ["Earnings:DriverShareRate"] = "0.70",
@@ -88,8 +92,7 @@ public class ProductionApiFactory : WebApplicationFactory<Program>
                 services.Remove(descriptor);
             }
 
-            services.AddDbContext<Fudis.Payments.Infra.FudisDbContext>(options =>
-                options.UseSqlServer("Server=(localdb)\\MSSQLLocalDB;Database=FudisPaymentsTests;Trusted_Connection=True;MultipleActiveResultSets=True"));
+            services.AddDbContext<Fudis.Payments.Infra.FudisDbContext>(options => options.UseSqlServer(connectionString));
         });
     }
 }
