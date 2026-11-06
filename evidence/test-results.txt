@@ -1,29 +1,49 @@
-﻿at Fudis.Payments.Tests.FakeNotificationService.NotifyRestaurant(Int32 orderId, CancellationToken cancellationToken) in C:\Users\WanderleyRocha\fudis-payments\tests\Fudis.Payments.Tests\FakeNotificationService.cs:line 36
-Correctas Fudis.Payments.Tests.ConcurrencyTests.ConcurrentDeliveries_NeverReturnServerError [641 ms]
-Correctas Fudis.Payments.Tests.ConcurrencyTests.ConcurrentDeliveriesOfTheSameEvent_CreateExactlyOneDriverEarning [150 ms]
-Correctas Fudis.Payments.Tests.ConcurrencyTests.ConcurrentDeliveriesOfDifferentEventsForTheSameOrder_CreateExactlyOneDriverEarning [42 ms]
-Correctas Fudis.Payments.Tests.ConcurrencyTests.WithoutTheUniqueIndex_TheOriginalSchemaPaysTheDriverTwice [46 ms]
-Correctas Fudis.Payments.Tests.LegacyEndpointTests.LegacyEndpoint_AppliesThePaymentAndCreatesTheEarning [56 ms]
-Correctas Fudis.Payments.Tests.LegacyEndpointTests.LegacyEndpoint_WhenTheRestaurantServiceFails_LosesTheNotification_AndFailsTheRequest [16 ms]
+Fudis.Payments.Tests -> C:\Users\WanderleyRocha\fudis-payments\tests\Fudis.Payments.Tests\bin\Debug\net8.0\Fudis.Payments.Tests.dll
+Serie de pruebas para C:\Users\WanderleyRocha\fudis-payments\tests\Fudis.Payments.Tests\bin\Debug\net8.0\Fudis.Payments.Tests.dll (.NETCoreApp,Version=v8.0)
+Correctas Fudis.Payments.Tests.ConcurrencyTests.ConcurrentDeliveries_NeverReturnServerError [712 ms]
+Correctas Fudis.Payments.Tests.ConcurrencyTests.ConcurrentDeliveriesOfTheSameEvent_CreateExactlyOneDriverEarning [147 ms]
+Correctas Fudis.Payments.Tests.ConcurrencyTests.ConcurrentDeliveriesOfDifferentEventsForTheSameOrder_CreateExactlyOneDriverEarning [56 ms]
+Correctas Fudis.Payments.Tests.ConcurrencyTests.WithoutTheUniqueIndex_TheOriginalSchemaPaysTheDriverTwice [33 ms]
+Correctas Fudis.Payments.Tests.LegacyEndpointExposureTests.LegacyEndpoint_IsNotAvailableOutsideDevelopmentAndTesting [67 ms]
+Correctas Fudis.Payments.Tests.LegacyEndpointExposureTests.NewEndpoint_IsAvailableInEveryEnvironment [30 ms]
+Correctas Fudis.Payments.Tests.LegacyEndpointTests.LegacyEndpoint_AppliesThePaymentAndCreatesTheEarning [62 ms]
+Correctas Fudis.Payments.Tests.LegacyEndpointTests.LegacyEndpoint_WhenTheRestaurantServiceFails_LosesTheNotification_AndFailsTheRequest [20 ms]
 Correctas Fudis.Payments.Tests.LegacyEndpointTests.NewEndpoint_WhenTheRestaurantServiceFails_KeepsThePaymentAndQueuesTheNotification [16 ms]
-Correctas Fudis.Payments.Tests.OutboxDispatcherTests.NewEndpoint_QueuesTheNotification_InsteadOfCallingTheRestaurantInline [12 ms]
-Correctas Fudis.Payments.Tests.OutboxDispatcherTests.Dispatcher_WhenTheRestaurantServiceFails_KeepsThePaymentApplied_AndSchedulesARetry [85 ms]
 at Fudis.Payments.Tests.FakeNotificationService.NotifyRestaurant(Int32 orderId, CancellationToken cancellationToken) in C:\Users\WanderleyRocha\fudis-payments\tests\Fudis.Payments.Tests\FakeNotificationService.cs:line 36
-Correctas Fudis.Payments.Tests.OutboxDispatcherTests.Dispatcher_DeliversOnRetry_AfterATransientFailure [79 ms]
-Correctas Fudis.Payments.Tests.OutboxDispatcherTests.TwoDispatchersRunningAtTheSameTime_DeliverTheNotificationOnlyOnce [41 ms]
-Correctas Fudis.Payments.Tests.OutboxDispatcherTests.Dispatcher_DeliversPendingNotification_AndMarksItDelivered [37 ms]
-Correctas Fudis.Payments.Tests.PaymentConfirmationTests.DriverEarning_IsSeventyPercent_RoundedAwayFromZero [31 ms]
-Correctas Fudis.Payments.Tests.PaymentConfirmationTests.SameGatewayEventDeliveredTwice_DoesNotPayTheDriverTwice [43 ms]
-Correctas Fudis.Payments.Tests.PaymentConfirmationTests.OrderThatIsNotPayable_IsRejected_AndNothingIsApplied [20 ms]
-Correctas Fudis.Payments.Tests.PaymentConfirmationTests.SecondGatewayEventForAnAlreadyPaidOrder_IsRejectedAsDoubleCharge [32 ms]
-Correctas Fudis.Payments.Tests.PaymentConfirmationTests.AmountMismatch_IsRejected_AndNothingIsApplied [31 ms]
-Correctas Fudis.Payments.Tests.PaymentConfirmationTests.ConfirmedPayment_AppliesStatusEarningInboxAndOutbox_Together [89 ms]
-Correctas Fudis.Payments.Tests.PaymentConfirmationTests.OrderWithoutAssignedDriver_IsRejected_AndNoEarningIsCreated [31 ms]
-Correctas Fudis.Payments.Tests.PaymentConfirmationTests.ForgedSignature_IsRejected_AndChangesNothing [22 ms]
-Correctas Fudis.Payments.Tests.PaymentConfirmationTests.StaleTimestamp_IsRejected_AndChangesNothing [22 ms]
-Correctas Fudis.Payments.Tests.PaymentConfirmationTests.SignatureSignedWithAnotherSecret_IsRejected_AndChangesNothing [25 ms]
-Correctas Fudis.Payments.Tests.PaymentConfirmationTests.CurrencyMismatch_IsRejected_AndNothingIsApplied [32 ms]
-Correctas Fudis.Payments.Tests.PaymentConfirmationTests.UnknownOrder_ReturnsNotFound [16 ms]
-Correctas Fudis.Payments.Tests.PaymentConfirmationTests.SameGatewayEventIdForADifferentOrder_IsRejected_AndTheSecondOrderIsNotLeftUnpaid [50 ms]
+at Fudis.Payments.Tests.FakeNotificationService.NotifyRestaurant(Int32 orderId, CancellationToken cancellationToken) in C:\Users\WanderleyRocha\fudis-payments\tests\Fudis.Payments.Tests\FakeNotificationService.cs:line 36
+at Fudis.Payments.Tests.FakeNotificationService.NotifyRestaurant(Int32 orderId, CancellationToken cancellationToken) in C:\Users\WanderleyRocha\fudis-payments\tests\Fudis.Payments.Tests\FakeNotificationService.cs:line 36
+at Fudis.Payments.Tests.FakeNotificationService.NotifyRestaurant(Int32 orderId, CancellationToken cancellationToken) in C:\Users\WanderleyRocha\fudis-payments\tests\Fudis.Payments.Tests\FakeNotificationService.cs:line 36
+at Fudis.Payments.Tests.FakeNotificationService.NotifyRestaurant(Int32 orderId, CancellationToken cancellationToken) in C:\Users\WanderleyRocha\fudis-payments\tests\Fudis.Payments.Tests\FakeNotificationService.cs:line 36
+at Fudis.Payments.Tests.FakeNotificationService.NotifyRestaurant(Int32 orderId, CancellationToken cancellationToken) in C:\Users\WanderleyRocha\fudis-payments\tests\Fudis.Payments.Tests\FakeNotificationService.cs:line 36
+at Fudis.Payments.Tests.FakeNotificationService.NotifyRestaurant(Int32 orderId, CancellationToken cancellationToken) in C:\Users\WanderleyRocha\fudis-payments\tests\Fudis.Payments.Tests\FakeNotificationService.cs:line 36
+at Fudis.Payments.Tests.FakeNotificationService.NotifyRestaurant(Int32 orderId, CancellationToken cancellationToken) in C:\Users\WanderleyRocha\fudis-payments\tests\Fudis.Payments.Tests\FakeNotificationService.cs:line 36
+Correctas Fudis.Payments.Tests.OutboxDeadLetterTests.DeadLetteredNotification_DoesNotAffectThePayment [96 ms]
+Correctas Fudis.Payments.Tests.OutboxDeadLetterTests.Notification_MovesToTheDeadLetterState_WhenTheRetryBudgetIsExhausted [53 ms]
+Correctas Fudis.Payments.Tests.OutboxDispatcherTests.NewEndpoint_QueuesTheNotification_InsteadOfCallingTheRestaurantInline [17 ms]
+Correctas Fudis.Payments.Tests.OutboxDispatcherTests.Dispatcher_WhenTheRestaurantServiceFails_KeepsThePaymentApplied_AndSchedulesARetry [26 ms]
+Correctas Fudis.Payments.Tests.OutboxDispatcherTests.Dispatcher_DeliversOnRetry_AfterATransientFailure [30 ms]
+Correctas Fudis.Payments.Tests.OutboxDispatcherTests.TwoDispatchersRunningAtTheSameTime_DeliverTheNotificationOnlyOnce [22 ms]
+Correctas Fudis.Payments.Tests.OutboxDispatcherTests.Dispatcher_DeliversPendingNotification_AndMarksItDelivered [19 ms]
+Correctas Fudis.Payments.Tests.PaymentConfirmationTests.DriverEarning_IsSeventyPercent_RoundedAwayFromZero [15 ms]
+Correctas Fudis.Payments.Tests.PaymentConfirmationTests.SameGatewayEventDeliveredTwice_DoesNotPayTheDriverTwice [19 ms]
+Correctas Fudis.Payments.Tests.PaymentConfirmationTests.OrderThatIsNotPayable_IsRejected_AndNothingIsApplied [19 ms]
+Correctas Fudis.Payments.Tests.PaymentConfirmationTests.SecondGatewayEventForAnAlreadyPaidOrder_IsRejectedAsDoubleCharge [20 ms]
+Correctas Fudis.Payments.Tests.PaymentConfirmationTests.AmountMismatch_IsRejected_AndNothingIsApplied [12 ms]
+Correctas Fudis.Payments.Tests.PaymentConfirmationTests.ConfirmedPayment_AppliesStatusEarningInboxAndOutbox_Together [12 ms]
+Correctas Fudis.Payments.Tests.PaymentConfirmationTests.OrderWithoutAssignedDriver_IsRejected_AndNoEarningIsCreated [12 ms]
+Correctas Fudis.Payments.Tests.PaymentConfirmationTests.ForgedSignature_IsRejected_AndChangesNothing [12 ms]
+Correctas Fudis.Payments.Tests.PaymentConfirmationTests.StaleTimestamp_IsRejected_AndChangesNothing [23 ms]
+Correctas Fudis.Payments.Tests.PaymentConfirmationTests.SignatureSignedWithAnotherSecret_IsRejected_AndChangesNothing [11 ms]
+Correctas Fudis.Payments.Tests.PaymentConfirmationTests.CurrencyMismatch_IsRejected_AndNothingIsApplied [13 ms]
+Correctas Fudis.Payments.Tests.PaymentConfirmationTests.UnknownOrder_ReturnsNotFound [7 ms]
+Correctas Fudis.Payments.Tests.PaymentConfirmationTests.SameGatewayEventIdForADifferentOrder_IsRejected_AndTheSecondOrderIsNotLeftUnpaid [32 ms]
+Correctas Fudis.Payments.Tests.PaymentEventAuditTests.SameEventIdWithADifferentAmount_IsRejectedAsPayloadMismatch [23 ms]
+Correctas Fudis.Payments.Tests.PaymentEventAuditTests.ForgedSignature_OnAnAlreadyAppliedEvent_StillReturnsUnauthorized [20 ms]
+Correctas Fudis.Payments.Tests.PaymentEventAuditTests.AppliedEvent_IsLoggedInTheSameTransactionAsThePayment [21 ms]
+Correctas Fudis.Payments.Tests.PaymentEventAuditTests.ForgedSignature_IsLoggedAsUnauthenticated [9 ms]
+Correctas Fudis.Payments.Tests.PaymentEventAuditTests.RejectedEvent_LeavesADurableTraceForReconciliation [9 ms]
+Correctas Fudis.Payments.Tests.PaymentEventAuditTests.StaleTimestamp_OnAnAlreadyAppliedEvent_ReturnsDuplicate [15 ms]
 ---
-dotnet test --logger console;verbosity=normal  =>  25 passed, 0 failed (SQL Server LocalDB)
+Local (Windows, SQL Server LocalDB): 35 passed, 0 failed
+CI (ubuntu-latest, SQL Server 2022 container): 35 passed, 0 failed
+CI run: https://github.com/WanderleyRS/fudis-payment-confirmation/actions/runs/42267028823
